@@ -1,0 +1,309 @@
+---
+title: "BA analysis test"
+author: "Eva SH"
+date: "10/14/2020"
+output: html_document
+---
+
+Setup
+```{r setup, include=FALSE}
+#Load!
+pacman::p_load(readr,tidyverse,dplyr,ggplot2,pastecs,ez,reshape2,stringr,lme4,stats,MuMIn,broom,emmeans,afex,lmerTest,scales,rstatix,ggpubr,magrittr,stats,plyr)
+```
+
+Hues defined
+```{r}
+#Hues of each color 
+red <- 12.2
+yellow <- 62.4
+green <- 136.5
+blue <- 193.6
+
+#Hues of seed colors
+reddish <- 327.55
+yellowish <- 49.85
+greenish <- 117.98
+blueish <- 179.34
+
+```
+
+Data loading and preprocessing
+```{r}
+#Load test data
+Test2 <- read_csv("~/Desktop/Cognitive Science/Bachelor/Test data and code/Test2.csv")
+
+#As factors
+Test2$Condition <- as.factor(Test2$Condition)
+Test2$Chain <- as.factor(Test2$Chain)
+Test2$Color <- as.factor(Test2$Color)
+
+#Add column with difference between matched hue and focal:
+Test2$Abs_Dif <- Test2$Focal-Test2$Hue
+
+#Ass column with relative difference between matched hue and focal:
+Test2$Rel_Dif <- 100/(Test2$Focal-Test2$Seed)*Test2$Abs_Dif
+
+View(Test2)
+
+```
+
+Modelling 
+```{r}
+
+#NB: The is a datapoint included for each chain with the seed coordinates (not a matching). Should no be included IRL.
+
+#Saturation
+require(afex)
+set_sum_contrasts()
+mm1 <- lmer(Saturation ~ Condition + Generation + Color + (0 + Chain|Generation), data = Test2, REML = F, control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  optCtrl = list(
+    ftol_abs = 1e-10,
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(mm1)
+
+#Hue angle
+#What is the matter with 0 or 1 in random effects? 
+require(afex)
+set_sum_contrasts()
+mm2 <- lmer(Rel_Dif ~ Condition + Generation + Color + (0 + Chain|Generation), data = Test2, REML = F, control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  optCtrl = list(
+    ftol_abs = 1e-10,
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(mm2)
+
+```
+
+
+Visualizations
+```{r}
+#Omit rows with NAs
+Test2 <- na.omit(Test2)
+
+#Hue
+ggplot(Test2,aes(Generation, Rel_Dif))+geom_point()
+
+#Saturation
+ggplot(Test2,aes(Generation, Saturation))+geom_point()
+
+#Boxplots
+color_sat <- ggboxplot(
+  Test2, x = "Color", y = "Saturation",
+  color = "Condition", palette = "jco"
+  )
+color_sat
+
+color_hue <- ggboxplot(
+  Test2, x = "Color", y = "Rel_Dif",
+  color = "Condition", palette = "jco"
+  )
+color_hue
+
+cond_sat <- ggboxplot(
+  Test2, x = "Condition", y = "Saturation",
+  color = "Color", palette = "jco"
+  )
+cond_sat
+
+cond_hue <- ggboxplot(
+  Test2, x = "Condition", y = "Rel_Dif",
+  color = "Color", palette = "jco"
+  )
+cond_hue
+
+#Trying out a line plot
+color_sat_line <- ggplot(Test2, aes(x=Generation,y=Saturation,group=Color))+
+  geom_line(stat="summary") +
+  expand_limits(y=0) +
+  xlab("Generations") + ylab("Saturation %") +
+  ggtitle("Plot")
+color_sat_line
+
+color_hue_line <- ggplot(Test2, aes(x=Generation,y=Rel_Dif,group=Color))+
+  geom_line(stat="summary") +
+  expand_limits(y=0) +
+  xlab("Generation") + ylab("Relative difference %") +
+  ggtitle("Plot")
+color_hue_line
+
+cond_sat_line <- ggplot(Test2, aes(x=Generation,y=Saturation,group=Condition))+
+  geom_line(stat="summary") +
+  expand_limits(y=0) +
+  xlab("Generations") + ylab("Saturation %") +
+  ggtitle("Plot")
+cond_sat_line
+
+cond_hue_line <- ggplot(Test2, aes(x=Generation,y=Rel_Dif,group=Condition))+
+  geom_line(stat="summary") +
+  expand_limits(y=0) +
+  xlab("Generation") + ylab("Relative difference %") +
+  ggtitle("Plot")
+cond_hue_line
+
+
+```
+
+REDO WITH ACTUAL DATA
+
+Loading and some extra wrangling
+```{r}
+###WE NEED TO FIND A SOLUTION WITH RED: IF STATEMENT FOR HUES BETWEEN 0 AND 20? But it works with the current data right now
+
+#Load
+Day1 <- read_csv("data_day_1_color.csv")
+Day2 <- read_csv("data_day_2_color.csv")
+Day2 <- Day2 %>% select(-("Focal"))
+
+#Merge day 1 and 2 data
+Day12 <- rbind(Day1,Day2)
+View(Day12)
+
+#Exclude English (for now)
+Day12 <- Day12 %>% filter(Language=="Danish")
+
+#As factors
+Day12$Condition <- as.factor(Day12$Condition)
+Day12$Chain <- as.factor(Day12$Chain)
+Day12$Color_label_source <- as.factor(Day12$Color_label_source)
+Day12$Color_label_matched <- as.factor(Day12$Color_label_matched)
+
+#Add 360 when matched hue is between 0 and 20 (check if it works when we have data lower than 20)
+Day12$Hue_matched <- case_when(Day12$Hue_matched < 21 ~ Day12$Hue_matched + 360,
+                               Day12$Hue_matched > 21 ~ Day12$Hue_matched)
+
+#Add column with the focal hue angle 
+Day12$Focal_Hue <- Day12$Color_label_source
+Day12$Focal_Hue <- revalue(Day12$Focal_Hue, c("seed græsgrøn" = "136.5","seed havblå" = "193.6", "seed mørk rosa" = "372.2", "seed sennepsgul" = "62.4"))
+#As numeric
+Day12$Focal_Hue <- as.numeric(paste(Day12$Focal_Hue))
+
+#Add column with the seed hue angle 
+Day12$Seed_Hue <- Day12$Color_label_source
+Day12$Seed_Hue <- revalue(Day12$Seed_Hue, c("seed græsgrøn" = "117.98","seed havblå" = "179.34", "seed mørk rosa" = "327.55", "seed sennepsgul" = "49.85"))
+#As numeric
+Day12$Seed_Hue <- as.numeric(paste(Day12$Seed_Hue))
+
+#Add column with difference between matched hue and focal:
+Day12$Abs_Dif <- Day12$Focal_Hue-Day12$Hue_matched
+
+#Ass column with relative difference between matched hue and focal:
+Day12$Rel_Dif <- 100/(Day12$Focal_Hue-Day12$Seed_Hue)*Day12$Abs_Dif
+
+#remove and order columns for overview
+Day12 <- Day12 %>% select(-c("X1","Language","Lightness_source","Lighness_matched","Color_label_matched"))
+
+col_order <- c("rt","Subject","Condition_label","Condition","Chain","Generation","Color_label_source","Saturation_source","Saturation_matched","Hue_source","Hue_matched","Focal_Hue","Seed_Hue","Abs_Dif","Rel_Dif")
+Day12 <- Day12[, col_order]
+
+View(Day12)
+
+```
+
+```{r}
+
+#Lineplot: Relative hue change over generations across chains 
+color_hue_line <- ggplot(Day12, aes(x = Generation, y = Rel_Dif, group = Color_label_source, color = Color_label_source))+
+  geom_line(stat="summary") +
+  expand_limits(y=0) +
+  xlab("Generation") + ylab("Relative difference %") +
+  ggtitle("Plot")
+color_hue_line
+
+#Lineplot 2: Relative hue change over generations for each chain individually (here chain 0)
+chain0 <- Day12 %>% filter(Chain==0)
+color_hue_line_2 <- ggplot(chain0, aes(x = Generation, y = Rel_Dif, group = Color_label_source, color = Color_label_source))+
+  geom_line(stat="summary") +
+  expand_limits(y=0) +
+  xlab("Generation") + ylab("Relative difference %") +
+  ggtitle("Plot")
+color_hue_line_2
+
+#Lineplot 3: Relative hue change over generations for each condition individually (here condition 1)
+cond1 <- Day12 %>% filter(Condition==1)
+color_hue_line_3 <- ggplot(cond1, aes(x = Generation, y = Rel_Dif, group = Color_label_source, color = Color_label_source))+
+  geom_line(stat="summary") +
+  expand_limits(y=0) +
+  xlab("Generation") + ylab("Relative difference %") +
+  ggtitle("Plot")
+color_hue_line_3
+
+#Lineplot 4: Relative hue change over generations for each condition individually (here condition 2)
+cond2 <- Day12 %>% filter(Condition==2)
+color_hue_line_4 <- ggplot(cond2, aes(x = Generation, y = Rel_Dif, group = Color_label_source, color = Color_label_source))+
+  geom_line(stat="summary") +
+  expand_limits(y=0) +
+  xlab("Generation") + ylab("Relative difference %") +
+  ggtitle("Plot")
+color_hue_line_4
+
+
+#Lineplot 5: Saturation change over generations across chains and conditions
+color_hue_line_5 <- ggplot(Day12, aes(x = Generation, y = Saturation_matched, group = Color_label_source, color = Color_label_source))+
+  geom_line(stat="summary") +
+  expand_limits(y=0) +
+  xlab("Generation") + ylab("Saturation %") +
+  ggtitle("Plot")
+color_hue_line_5
+
+
+
+
+```
+
+Modelling
+```{r}
+#models
+#Saturation
+require(afex)
+set_sum_contrasts()
+m_sat_2 <- lmer(Saturation_matched ~ Chain + Condition + Generation + Color_label_source + (0 + Chain|Generation), data = Day1, REML = F, control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  optCtrl = list(
+    ftol_abs = 1e-10,
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(m_sat_2)
+
+#Hue angle
+#What is the matter with 0 or 1 in random effects? 
+require(afex)
+set_sum_contrasts()
+m_hue_2 <- lmer(Rel_Dif ~ Condition + Generation + Color + (0 + Chain|Generation), data = Test2, REML = F, control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  optCtrl = list(
+    ftol_abs = 1e-10,
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(mm2)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
