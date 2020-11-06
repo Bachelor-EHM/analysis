@@ -7,8 +7,8 @@ output: html_document
 
 Setup
 ```{r setup, include=FALSE}
-#Load!
-pacman::p_load(readr,tidyverse,dplyr,ggplot2,pastecs,ez,reshape2,stringr,lme4,stats,MuMIn,broom,emmeans,afex,lmerTest,scales,rstatix,ggpubr,magrittr,stats,plyr)
+#Load
+pacman::p_load(readr,dplyr)
 ```
 
 Loading and some extra wrangling
@@ -19,8 +19,7 @@ setwd("~/Desktop/Cognitive Science/Bachelor/Test data and code/analysis")
 
 data <- read_csv("color_matching2020-10-31.csv")
 
-
-# #As factors
+#As factors
 data$Subject <- as.factor(data$Subject)
 data$Language <- as.factor(data$Language)
 data$Gender <- as.factor(data$Gender)
@@ -68,8 +67,28 @@ d_blue_cond2 <- d_blue %>% filter(Condition=="2")
 
 ```
 
+
+Descriptive statistics
+```{r}
+#Hue
+danish %>% 
+  group_by(Chain, Condition,Color_label_matched) %>% 
+  summarise(max(Rel_dif),min(Rel_dif),mean(Hue_matched)) %>% 
+  arrange(Color_label_matched)
+
+#Saturation
+danish %>% 
+  group_by(Chain, Condition,Color_label_matched) %>% 
+  summarise(max(Saturation_matched),min(Saturation_matched),mean(Saturation_matched))
+```
+
+
+
 Demographics
 ```{r}
+#Load
+pacman::p_load(readr,tidyverse,ggplot2,pastecs,ez,reshape2,stringr,lme4,stats,MuMIn,broom,emmeans,afex,lmerTest,scales,rstatix,ggpubr,magrittr,stats)
+
 #Dataframe with 1 row pr subject 
 unique <- data[ !duplicated(data$Subject,fromLast=TRUE), ]
 unique_danish <- danish[ !duplicated(danish$Subject,fromLast=TRUE), ]
@@ -287,33 +306,19 @@ blue_sat <- ggplot(blue, aes(x = Generation, y = Saturation_matched, group = Cha
   facet_wrap(~ Condition)
 blue_sat
 
-
 ```
 
-Descriptive statistics
+Normality checks
 ```{r}
-#Min and max sat + hue value in each chain
 
-#DANISH
-aggregate(danish$Rel_dif,
-          by = list(Chain = danish$Chain,
-                    Condition = danish$Condition),
-          max)
+#Normality (Shapiro-Wilks)
+danish %>% group_by(Chain, Condition, Color_label_matched) %>% shapiro_test(Rel_dif)
+ggqqplot(danish, "Rel_dif", ggtheme = theme_bw()) +
+  facet_grid(Condition + Color_label_matched ~ Chain, labeller = "label_both")
 
-aggregate(danish$Rel_dif,
-          by = list(Chain = danish$Chain,
-                    Condition = danish$Condition),
-          min)
-
-aggregate(danish$Saturation_matched,
-          by = list(Chain = danish$Chain,
-                    Condition = danish$Condition),
-          max)
-
-aggregate(danish$Saturation_matched,
-          by = list(Chain = danish$Chain,
-                    Condition = danish$Condition),
-          min)
+danish %>% group_by(Chain, Condition, Color_label_matched) %>% shapiro_test(Saturation_matched)
+ggqqplot(danish, "Saturation_matched", ggtheme = theme_bw()) +
+  facet_grid(Condition + Color_label_matched ~ Chain, labeller = "label_both")
 
 ```
 
@@ -374,6 +379,13 @@ summary(model6)
 
 Exploratory analyses
 ```{r}
+#Correlation between change in saturation and hue angle? 
+
+#Convergence towards other focals 
+  #Find focal measure in HSL
+
+#Increased levels of confidence predicts accuracy
+
 
 ```
 
