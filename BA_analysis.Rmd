@@ -1,0 +1,855 @@
+---
+title: "BA analysis"
+author: "Matilde Jacobsen"
+date: "created: 10/14/2020, last updated: `r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+#Setup
+```{r setup, include=FALSE}
+#Clean environment
+rm(list = ls())
+#Load packages
+pacman::p_load(readr,dplyr,lme4,lmerTest,mgcv,tidyverse, scales)
+```
+
+#Loading and some extra wrangling
+```{r}
+#Loading data
+data <- read_csv("Cleaned_data/color_matching2020-11-13.csv")
+
+
+#As factors
+data$Subject <- as.factor(data$Subject)
+data$Language <- as.factor(data$Language)
+data$Gender <- as.factor(data$Gender)
+data$Language_spoken <- as.factor(data$Language_spoken)
+data$Condition <- as.factor(data$Condition)
+data$Chain <- as.factor(data$Chain)
+data$Color_label_source <- as.factor(data$Color_label_source)
+data$Color_label_matched <- as.factor(data$Color_label_matched)
+data$Age <- as.numeric(data$Age)
+
+# #Create column with native language combined: Danish, English, Danish bilingual and other
+# data$Language_class <- revalue(data$Language_spoken,c("dansk" = "Danish", "danish" = "Danish","dansker" = "Danish","Dansk" = "Danish","DK"="Danish","Engelsk" = "English", "EnglishandArabic" = "English", "DanskEngelsk" = "Bilingual", "Danskfransk" = "Bilingual", "DanskogBosnisk" = "Bilingual","Danskogengelsk" = "Bilingual", "Danskogsomalisk" = "Bilingual", "NederlandskDansk" = "Bilingual", "Dansksomalisk" = "Bilingual", "Albansk" = "Other", "Croatian" = "Other", "Czech" = "Other", "Estonian" = "Other", "Fransk" = "Other", "geman" = "Other", "German" = "Other", "GermanAfrikaans" = "Other", "Greek" = "Other", "Hollandsk" = "Other", "ita" = "Other", "Lithuanian" = "Other", "Lykke" = "Other", "Polish" = "Other", "polish" = "Other", "portuguese" = "Other", "Romanian" = "Other", "rumænsk" = "Other", "Russian" = "Other", "somalisk" = "Other", "spanish" = "Other", "Spanish" = "Other", "Svensk" = "Other", "Swedish" = "Other", "Ukrainian" = "Other", "Ungarsk" = "Other"))
+
+#Remove chain 5
+data <- data %>% filter(!Chain=="5")
+
+#Rescale Confidence
+data$Confidence <- rescale(data$Confidence, to = c(1, 7))
+
+#Rename gender for prettier plots
+data$Gender <- ifelse(data$Gender == "female", "Female", "Male")
+
+write.csv(data, "data.csv")
+```
+
+
+#Subsets
+```{r}
+#Datasets divided into Danish and English
+danish <- data %>% filter(Language == "Danish")
+english <- data %>% filter(Language == "English")
+
+#Subset for each condition
+cond1_danish <- danish %>% filter(Condition==1)
+cond2_danish <- danish %>% filter(Condition==2)
+cond1_english <- english %>% filter(Condition==1)
+cond2_english <- english %>% filter(Condition==2)
+
+#Subsets by color
+d_red <- danish %>% filter(Color_label_matched == "seed dark rose")
+d_yellow <- danish %>% filter(Color_label_matched == "seed mustard")
+d_green <- danish %>% filter(Color_label_matched == "seed grass green")
+d_blue <- danish %>% filter(Color_label_matched == "seed ocean blue")
+
+#Subsets by color AND condition
+d_red_cond1 <- d_red %>% filter(Condition=="1")
+d_red_cond2 <- d_red %>% filter(Condition=="2")
+d_yellow_cond1 <- d_yellow %>% filter(Condition=="1")
+d_yellow_cond2 <- d_yellow %>% filter(Condition=="2")
+d_green_cond1 <- d_green %>% filter(Condition=="1")
+d_green_cond2 <- d_green %>% filter(Condition=="2")
+d_blue_cond1 <- d_blue %>% filter(Condition=="1")
+d_blue_cond2 <- d_blue %>% filter(Condition=="2")
+
+```
+
+
+#Descriptive statistics
+```{r}
+#Hue maximum, minimum and mean
+stats_hue <- danish %>% 
+  group_by(Chain, Condition,Color_label_matched) %>% 
+  summarise(max(Rel_dif),min(Rel_dif),mean(Hue_matched)) %>% 
+  arrange(Color_label_matched)
+
+hue_by_color_overall <- data %>% 
+  group_by(Color_label_matched, Condition) %>% 
+  summarise(max(Rel_dif), min(Rel_dif), mean(Rel_dif), sd(Rel_dif), max(Rel_dif_2),min(Rel_dif_2), mean(Rel_dif_2), max(Hue_matched), min(Hue_matched), mean(Hue_matched), mean(Seed), mean(Focal), mean(Secondary_focal))
+
+
+#Saturation
+stats_sat <- data %>% 
+  group_by(Color_label_matched, Condition) %>% 
+  summarise(max(Saturation_matched),min(Saturation_matched),mean(Saturation_matched), sd(Saturation_matched))
+
+
+```
+
+
+#Demographics
+```{r}
+#Load
+pacman::p_load(readr,tidyverse,ggplot2,pastecs,ez,reshape2,stringr,lme4,stats,MuMIn,broom,emmeans,afex,lmerTest,scales,rstatix,ggpubr,magrittr,stats)
+
+#Dataframe with 1 row pr subject 
+unique <- data[ !duplicated(data$Subject,fromLast=TRUE), ]
+unique_danish <- danish[ !duplicated(danish$Subject,fromLast=TRUE), ]
+unique_english <- english[ !duplicated(english$Subject,fromLast=TRUE), ]
+
+#In each language
+unique %>% count("Language")
+
+#Conditions
+unique_danish %>% count("Condition") 
+unique_english %>% count("Condition") 
+
+#Gender
+#Across conditions
+unique_danish %>% count("Gender") 
+(100/153) * 85
+(100/153) * 68
+unique_english %>% count("Gender")
+(100/32) * 15
+(100/32) * 17
+
+#For each condition
+unique_danish %>% filter(Condition=="1") %>% count("Gender") 
+(100/78) * 46
+(100/78) * 32
+unique_danish %>% filter(Condition=="2") %>% count("Gender")
+(100/75) * 39 
+(100/75) * 36
+
+unique_english %>% filter(Condition=="1") %>% count("Gender") 
+(100/16) * 4
+(100/16) * 12
+unique_english %>% filter(Condition=="2") %>% count("Gender") 
+(100/16) * 11
+(100/16) * 5
+
+#Age
+#Across condition
+unique_danish %>% get_summary_stats(Age,type = "mean_sd")
+unique_english %>% get_summary_stats(Age,type = "mean_sd")
+
+#For each condition
+unique_danish %>% filter(Condition=="1") %>% get_summary_stats(Age,type = "mean_sd")
+unique_danish %>% filter(Condition=="2") %>% get_summary_stats(Age,type = "mean_sd")
+unique_english %>% filter(Condition=="1") %>% get_summary_stats(Age,type = "mean_sd")
+unique_english %>% filter(Condition=="2") %>% get_summary_stats(Age,type = "mean_sd")
+
+#Native languages
+#Across conditions
+unique_danish %>% count("Language_class")
+(100/153) * 136
+(100/153) * 1
+(100/153) * 7
+(100/153) * 9
+unique_english %>% count("Language_class")
+(100/32) * 22
+(100/32) * 5
+
+#For each condition
+unique_danish %>%  filter(Condition=="1") %>% count("Language_class")
+100/78 * 66
+100/78 * 4
+100/78 * 8
+unique_danish %>%  filter(Condition=="2") %>% count("Language_class")
+100/75 * 70
+100/75 * 1
+100/75 * 3
+
+unique_english %>%  filter(Condition=="1") %>% count("Language_class")
+100/16 * 11
+100/16 * 2
+100/16 * 3
+unique_english %>%  filter(Condition=="2") %>% count("Language_class")
+
+```
+
+#Normality checks
+```{r}
+
+#Normality (Shapiro-Wilks)
+norm_hue <- danish %>% group_by(Chain, Condition, Color_label_matched) %>% shapiro_test(Rel_dif) %>% arrange(Color_label_matched)
+ggqqplot(danish, "Rel_dif", ggtheme = theme_bw()) +
+  facet_grid(Condition + Color_label_matched ~ Chain, labeller = "label_both")
+
+norm_sat <- danish %>% group_by(Chain, Condition, Color_label_matched) %>% shapiro_test(Saturation_matched)
+ggqqplot(danish, "Saturation_matched", ggtheme = theme_bw()) +
+  facet_grid(Condition + Color_label_matched ~ Chain, labeller = "label_both")
+
+```
+
+
+#Modeling Saturation 
+```{r}
+
+## Construct mixed model with random slopes for generation, condition and interaction between generation and condition by color, chain, and subjects in chain:
+sat <- lmer(
+  Saturation_matched ~ Generation + Condition + Generation:Condition + 
+  (1 + Generation + Condition + Generation:Condition | Color_label_matched) +
+  (1 + Generation + Condition + Generation:Condition | Chain) + 
+  (1 | Chain:Subject), 
+  data = danish, 
+  REML = T, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+# Explanation:
+# - mixed model modeling level of saturation as a function of generation, condition (sees color name or 
+#   not), and the interaction of these
+# - with random intercepts (by-chain variation in level of saturation, by-color variation in level of 
+#   saturation, and by-subject in chain variation in level of saturation)
+# - and random slopes for generation, condition and the interaction between generation and condition 
+#   (by-chain/color/subject variation in the slope of generation, condition and the interaction between 
+#   generation and condition)
+# - and a random intercept / slope correlation
+# - we set REML = T because we want to perform likelihood ratio tests 
+#   comparing the random effects (for fixed effects it should be REML = F)
+#   (The estimates for the variance of the random effects are better
+#    when using REML = T.) 
+summary(sat)
+
+
+##Testing random effects##
+## The same model with decorrelated random effects structure:
+sat_no_c <- lmer(
+  Saturation_matched ~ Generation + Condition + Generation:Condition + 
+  (0 + Generation + Condition + Generation:Condition | Color_label_matched) +
+  (1 | Color_label_matched) +
+  (0 + Generation + Condition + Generation:Condition | Chain) + 
+  (1 | Chain) + 
+  (0 + Generation + Condition + Generation:Condition | Chain:Subject), 
+  data = danish, 
+  REML = T, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(sat_no_c)
+
+## Test the necessity of the correlation parameter:
+anova(sat, sat_no_c, refit = F) 
+# correlation not necessary (p = 1)
+# We compare mainm_sat and mainm_sat_no_c with refit=F to ensure that
+# no refitting with REML = F happens (default for likelihood ratio tests)
+
+## The same model without random slopes:
+sat_no_slopes <- lmer(
+  Saturation_matched ~ Generation + Condition + Generation:Condition + 
+  (1 | Color_label_matched) +
+  (1 | Chain) + 
+  (1 | Chain:Subject), 
+  data = danish, 
+  REML = F, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(sat_no_slopes)
+
+## Test the necessity of the random slopes:
+anova(sat_no_slopes, sat_no_c, refit = F) 
+# slopes necessary (p < 0.001)
+# There is a significant difference, indicating that the slopes do improve the fit
+# The model with slopes ("mainm_sat_no_c") has a higher log likelihood / lower AIC (= better fit)
+# than the model without slopes ("mainm_sat_no_slopes" )
+# renaming the model with the best random effects structure
+sat_all_main <- sat_no_c
+
+##Testing fixed effects##
+
+## Without interaction:
+sat_no_interaction <- lmer(
+  Saturation_matched ~ Generation + Condition + 
+  (0 + Generation + Condition + Generation:Condition | Color_label_matched) +
+  (1 | Color_label_matched) +
+  (0 + Generation + Condition + Generation:Condition | Chain) + 
+  (1 | Chain) + 
+  (0 + Generation + Condition + Generation:Condition | Chain:Subject) +
+  (1 | Chain:Subject), 
+  data = danish, 
+  REML = T, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(sat_no_interaction)
+
+
+## Generation only
+sat_gen_only <- lmer(
+  Saturation_matched ~ Generation + 
+  (0 + Generation +  Condition + Generation:Condition | Color_label_matched) +
+  (1 | Color_label_matched) +
+  (0 + Generation +  Condition + Generation:Condition | Chain) + 
+  (1 | Chain) + 
+  (0 + Generation +  Condition + Generation:Condition | Chain:Subject) +
+  (1 | Chain:Subject), 
+  data = danish, 
+  REML = T, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(sat_gen_only)
+
+
+##Condition only
+sat_con_only <- lmer(
+  Saturation_matched ~ Condition + 
+  (0 + Generation +  Condition + Generation:Condition | Color_label_matched) +
+  (1 | Color_label_matched) +
+  (0 + Generation +  Condition + Generation:Condition | Chain) + 
+  (1 | Chain) + 
+  (0 + Generation +  Condition + Generation:Condition | Chain:Subject) +
+  (1 | Chain:Subject), 
+  data = danish, 
+  REML = T, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(sat_con_only)
+
+##Interaction only
+sat_interaction_only <- lmer(
+  Saturation_matched ~ Generation:Condition + 
+  (0 + Generation +  Condition + Generation:Condition | Color_label_matched) +
+  (1 | Color_label_matched) +
+  (0 + Generation +  Condition + Generation:Condition | Chain) + 
+  (1 | Chain) + 
+  (0 + Generation +  Condition + Generation:Condition | Chain:Subject) +
+  (1 | Chain:Subject), 
+  data = danish, 
+  REML = T, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(sat_con_only)
+
+
+##Null model
+sat_null <- lmer(
+  Saturation_matched ~ 1 +
+  (0 + Generation + Condition + Generation:Condition | Color_label_matched) +
+  (1 | Color_label_matched) +
+  (0 + Generation + Condition + Generation:Condition | Chain) + 
+  (1 | Chain) + 
+  (0 + Generation + Condition + Generation:Condition | Chain:Subject) +
+  (1 | Chain:Subject), 
+  data = danish, 
+  REML = T, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(sat_null)
+
+#Testing all fixed effects combination
+anova(sat_null, sat_no_interaction, sat_con_only, sat_gen_only, sat_interaction_only, sat_all_main)
+# - notice that when testing for a fixed effect, we keep the random effects structure the same
+# only two models were significantly different from the null model:
+# "sat_gen_only" - the one where Saturation was predicted by generation as the only fixed effect
+# "sat_interaction_only" - the one where Saturation was predicted by the interaction between generation and condition as the only fixed effect
+# for "sat_gen_only" AIC = 4660.8 and log likelihood = -2294.4
+# for "sat_interaction_only" AIC = 4662.7 and log likelihood = -2294.4
+
+#Thus the simplest model which best explains the data is the "sat_interaction_only"
+#I will rename it to final saturation model
+final_sat <- sat_interaction_only
+summary(final_sat)
+# We see no effect of the interactions in the model which means that our hypothesis has not been confirmed. 
+# Saturation does not increase over time!
+
+## We investigate the residuals of the final model:
+
+hist(residuals(final_sat)) # good
+qqnorm(residuals(final_sat)); qqline(residuals(final_sat)) # beautiful
+plot(fitted(final_sat), residuals(final_sat)) # good
+# Explanation:
+# - since the residuals look approximately normal (as revealed through histograms and Q-Q plots)
+#   there is no problem with the assumption of normality
+# - as the residual plot looks blob-like, there is no problem with the assumption of homoskedasticity??
+# check the above!!!
+
+## Inspect the random effects estimates:
+
+coef(final_sat) 
+# All subjects, chains and colors have the same intercept that we put to 60% saturation
+# for chain 1 in condition 2 the slope has a very steep drop of -24
+# the effect of generation is basically 0 across chains which is also evident from the insignificant fixed effect of generation from the model output
+```
+
+
+
+#Modeling Hue
+```{r}
+## Construct mixed model with random slopes for generation, condition and interaction between generation and condition by color, chain, and subjects in chain:
+
+hue <- lmer(
+  Rel_dif ~ Generation + Condition + Generation:Condition +
+  (1 + Generation + Condition + Generation:Condition | Color_label_matched) + 
+  (1 + Generation + Condition + Generation:Condition| Chain) +
+  (1 + Generation + Condition + Generation:Condition| Chain:Subject),
+  data = danish, 
+  REML = F, control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10,
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(hue)
+
+#Baswed on insights from Sophia, we try a new structure
+#mo(Generation) treat generation as monototic variable, meaning that it can't go back in generation (sort of like a time variable)
+
+hue2 <- lmer(
+  Rel_dif ~ 0 + mo(Generation) + Condition + mo(Generation):Condition +
+  (1 + mo(Generation) + Condition + mo(Generation):Condition | Color_label_matched) + 
+  (1 + Condition | gr(Subject, by = Chain)),
+  data = danish, 
+  REML = F, control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10,
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+
+summary(hue2)
+##Testing random effects##
+
+## The same model with decorrelated random effects structure:
+hue_no_cor <- lmer(
+  Rel_dif ~ Generation + Condition + Generation:Condition + 
+  (0 + Generation + Condition + Generation:Condition | Color_label_matched) +
+  (1 | Color_label_matched) +
+  (0 + Generation + Condition + Generation:Condition | Chain) + 
+  (1 | Chain) + 
+  (0 + Generation + Condition + Generation:Condition | Chain:Subject) +
+  (1 | Chain:Subject), 
+  data = danish, 
+  REML = T, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+
+summary(hue_no_cor)
+
+## Test the necessity of the correlation parameter:
+anova(hue, hue_no_cor, refit = F) 
+# correlation is necessary (p < 0.005) so we keep the random structure from "hue"
+
+## The same model without random slopes:
+hue_no_slopes <- lmer(
+  Rel_dif ~ Generation + Condition + Generation:Condition + 
+  (1 | Color_label_matched) +
+  (1 | Chain) + 
+  (1 | Chain:Subject), 
+  data = danish, 
+  REML = F, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(hue_no_slopes)
+
+## Test the necessity of the random slopes:
+anova(hue_no_slopes, hue, refit = F) 
+# slopes necessary (p < 0.06)
+# There is a (so close to that we accept it) significant difference, indicating that the slopes do improve the fit
+hue_all_main <- hue
+
+##Testing fixed effects##
+##Main effects: Relative hue difference predicted by generation, condition and interaction between the two
+## Without interaction:
+hue_no_interaction <- lmer(
+  Rel_dif ~ Generation + Condition + 
+  (1 + Generation + Condition + Generation:Condition | Color_label_matched) + 
+  (1 + Generation + Condition + Generation:Condition| Chain) +
+  (1 + Generation + Condition + Generation:Condition| Chain:Subject),
+  data = danish, 
+  REML = T, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(hue_no_interaction)
+
+
+## Generation only
+hue_gen_only <- lmer(
+  Rel_dif ~ Generation + 
+  (1 + Generation + Condition + Generation:Condition | Color_label_matched) + 
+  (1 + Generation + Condition + Generation:Condition| Chain) +
+  (1 + Generation + Condition + Generation:Condition| Chain:Subject),
+  data = danish, 
+  REML = T, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(hue_gen_only)
+
+
+##Condition only
+hue_con_only <- lmer(
+  Rel_dif ~ Condition + 
+  (1 + Generation + Condition + Generation:Condition | Color_label_matched) + 
+  (1 + Generation + Condition + Generation:Condition| Chain) +
+  (1 + Generation + Condition + Generation:Condition| Chain:Subject),
+  data = danish, 
+  REML = T, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(hue_con_only)
+
+##Interaction only
+hue_interaction_only <- lmer(
+  Rel_dif ~ Generation:Condition + 
+  (1 + Generation + Condition + Generation:Condition | Color_label_matched) + 
+  (1 + Generation + Condition + Generation:Condition| Chain) +
+  (1 + Generation + Condition + Generation:Condition| Chain:Subject), 
+  data = danish, 
+  REML = T, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(hue_interaction_only)
+
+
+##Null model
+hue_null <- lmer(
+  Rel_dif ~ 1 + 
+  (1 + Generation + Condition + Generation:Condition | Color_label_matched) + 
+  (1 + Generation + Condition + Generation:Condition| Chain) +
+  (1 + Generation + Condition + Generation:Condition| Chain:Subject),
+  data = danish, 
+  REML = T, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(hue_null)
+
+#Testing all fixed effects combination
+anova(hue_null, hue_no_interaction, hue_con_only, hue_gen_only, hue_interaction_only, hue_all_main)
+# only one model were significantly different from the null model:
+# "hue_interaction_only" - the one where Hue difference was predicted by the interaction between generation and condition as the only fixed effect
+
+#Thus the simplest model which best explains the data is the "hue_interaction_only"
+#I will rename it to final hue model
+final_hue <- hue_interaction_only
+summary(final_hue)
+# We see no effect of the interactions in the model which means that our hypothesis has not been confirmed. 
+# Hue difference does not decrease over time! But there is a small tendency in directionality indicating that there could be an effect with more studies
+
+## We investigate the residuals of the final model:
+
+hist(residuals(final_hue)) # good
+hist(log(residuals(final_hue)))
+qqnorm(residuals(final_hue)); qqline(residuals(final_hue)) # there seem to be some outliers??
+plot(fitted(final_hue), residuals(final_hue)) # good
+# Explanation:
+# - since the residuals look approximately normal (as revealed through histograms and Q-Q plots)
+#   there is no problem with the assumption of normality
+# - as the residual plot looks blob-like, there is no problem with the assumption of homoskedasticity
+
+## Inspect the random effects estimates:
+
+  coef(final_hue) 
+##Intercepts:
+# For the subjects all intercepts are constant at 99.6 meaning that they are all close to 100% which would be the seed color - but I generally don't get the slopes
+# For the chain and color coefficiants the intercepts vary according how far the first generation was from the seed color 
+
+##Coefficients within chains:
+# it looks like chain 3 and 4 are the sinners, as they only have positive slopes, where all the others have negative slopes
+# chain 3 seems to have an especially steep positive slope for condition 2
+# chain 5 seems to have an especially steep negative slope for condition 2
+
+##Coefficients within colors:
+# dark rose seems to generally produce a positive slope meaning that it converges away from it's focal color but instead towards blue
+# grass green seems also to produce positive slopes, and unproportionately much so the condition 2 (+13.5) which would suggest that it converges towards yellow
+# mustard seems to generally produce a negative slope meaning that it converges towards it's focal color yellow
+# ocean blue also generally seems to produce a negative slope meaning that it converges towards it's focal color blue
+
+```
+
+
+#Modeling colors seperately
+```{r}
+danish$Generation <- as.ordered(danish$Generation)
+danish$Generation <- as.numeric(danish$Generation)
+
+color1 <- lmer(
+  Rel_dif ~ Generation:Color_label_matched +
+  (1 + Generation + Condition + Generation:Color_label_matched | Chain) +
+  (1 + Generation + Condition + Generation:Color_label_matched | Chain:Subject),
+  data = danish, 
+  REML = T, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+      )))
+summary(color1)
+?lmer
+#Looking at the last generation 
+
+#Effect of color
+color_gen_hue <- lm(Rel_dif ~ 0 + Color_label_matched * Generation, data = danish)
+summary(color_gen_hue)
+
+color_gen_sat <- lm(Saturation_matched ~ 0 + Color_label_matched * Generation, data = danish)
+summary(color_gen_sat)
+
+#Effect of color in interaction with condition
+color_interaction_hue <- lm(Rel_dif ~ 0 + Color_label_matched * Generation * Condition, data = danish)
+summary(color_interaction_hue)
+
+color_interaction_sat <- lm(Saturation_matched ~ 0 + Color_label_matched * Generation * Condition, data = danish)
+summary(color_interaction_sat)
+
+#Let's compare the models
+# Hue:
+anova(color_gen_hue, color_interaction_hue)
+# color_interaction_hue is significantly different from color_gen_hue, so it would be the best explaining model
+
+# Saturation:
+anova(color_gen_sat, color_interaction_sat)
+# again the model with condition is the best fitting model
+
+
+
+#Yellow
+hue_mustard <- lm(Rel_dif ~ Generation, data = d_yellow)
+hue_mustard_with_interaction <- lm(Rel_dif ~ Generation:Condition, data = d_yellow)
+hue_mustard_null <- lm(Rel_dif ~ 1, data = d_yellow)
+#testing diferent models
+anova(hue_mustard_null, hue_mustard, hue_mustard_with_interaction)
+
+summary(hue_mustard)
+# the effect of generation has a significantly negative slope of -2.629 (p = 0.0163), meaning that it goes towards yellow as we predicted
+
+#Blue
+hue_ocean <- lm(Rel_dif ~ Generation, data = d_blue)
+hue_ocean_with_interaction <- lm(Rel_dif ~ Generation:Condition, data = d_blue)
+hue_ocean_null <- lm(Rel_dif ~ 1, data = d_blue)
+#testing diferent models
+anova(hue_ocean_null, hue_ocean, hue_ocean_with_interaction)
+
+summary(hue_ocean_with_interaction)
+#the effect of generation has a negative slope for both conditions (cond1: -2.7278, cond2: -0.5031) though only significantly so for condition 1 (p < 0.001) meaning that it goes towards blue as we predicted
+
+
+#Red
+hue_rose <- lm(Rel_dif ~ Generation, data = d_red)
+hue_rose_with_interaction <- lm(Rel_dif ~ Generation:Condition, data = d_red)
+hue_rose_null <- lm(Rel_dif ~ 1, data = d_red)
+#testing diferent models
+anova(hue_rose_null, hue_rose, hue_rose_with_interaction)
+
+summary(hue_rose)
+# the effect of generation has a significantly positive slope, meaning that it goes towards blue and not red as we predicted
+
+#Green
+hue_grass <- lm(Rel_dif ~ Generation, data = d_green)
+hue_grass_with_interaction <- lm(Rel_dif ~ Generation:Condition, data = d_green)
+hue_grass_null <- lm(Rel_dif ~ 1, data = d_green)
+#testing diferent models
+anova(hue_grass_null, hue_grass, hue_grass_with_interaction)
+# the null model is the best fit, so our predictors doesn't predict anything about the seed color green
+
+```
+
+
+
+#Exploratory Analyses 1:
+Testing the post hoc hypothesis that for the seed colors that converges in the opporsite direction, they might converge towards their secondary intermediate hues instead of their primary foci
+
+```{r}
+#Secondary hues
+model7 <- lm(Rel_dif_2 ~ 0 + Color_label_matched * Generation, data = danish)
+summary(model7)
+# all the slopes for color are significant, but only the red seed, converges towards it's secondary focal (the relative distance becomes smaller: -2.9191 p = < 00.1), namely purple, whereas all other seeds converges away from the secondary focal (the distance becomes bigger)
+
+
+## Looking at red seperately
+hue2_dark_rose <- lm(Rel_dif_2 ~ Generation:Condition, data = d_red)
+hue2_dark_rose_no_interaction <- lm(Rel_dif_2 ~ Generation, data = d_red)
+hue2_dark_rose_null <- lm(Rel_dif_2 ~ 1, data = d_red)
+# testing differences 
+anova(hue2_dark_rose_null, hue2_dark_rose, hue2_dark_rose_no_interaction)
+# it seems like the interaction model is significantly better than the null model, thus this will be investigated
+summary(hue2_dark_rose)
+# here their is a significant effect across conditions with a negative slope which means that dark rose is generally converging towards their secondary focal hue, which is purple.
+```
+
+#Exploratory Analyses 2:
+2: Prdicting accuracy
+```{r}
+pacman::p_load(ggpubr, NCmisc, RColorBrewer, unikn)
+#Increased levels of confidence predicts accuracy
+# Descriptive
+stats_acc <- data %>% 
+  group_by(Gender, Color_label_matched) %>% 
+  summarise(min(Accuracy_hue),max(Accuracy_hue),mean(Accuracy_hue),sd(Accuracy_hue),min(Accuracy_sat),max(Accuracy_sat),mean(Accuracy_sat),sd(Accuracy_sat),mean(Confidence),sd(Confidence)) %>% 
+  arrange(Color_label_matched)
+
+## Outliers
+# outliers1 <- which.outlier(data$Accuracy_hue)
+# outliers2 <- which.outlier(data$Accuracy_sat)
+outliers_hue <- boxplot(data$Accuracy_hue, plot=FALSE)$out
+outliers_sat <- boxplot(data$Accuracy_sat, plot=FALSE)$out
+#remove outliers
+data_no_outliers_hue<- data[-which(data$Accuracy_hue %in% outliers_hue),]
+data_no_outliers_sat<- data[-which(data$Accuracy_sat %in% outliers_sat),]
+
+## Simple models
+#Hypothesis: accuracy will decrease if confidence goes up
+#For hue
+hue_acc_con <- lm(Accuracy_hue ~ Confidence:Gender, data = data_no_outliers_hue)
+summary(hue_acc_con)
+#For saturation
+sat_acc_con <- lm(Accuracy_sat ~ Confidence:Gender, data = data_no_outliers_sat)
+summary(sat_acc_con)
+
+
+
+```
+
+
+#Color names
+```{r}
+naming <- read.csv("Cleaned_data/color_naming2020-10-31.csv")
+naming <- naming %>% rename(Color_label_source = Color_label_naming)
+data_labeled <- merge(data, naming, by = c("Color_label_source","Subject","Chain","Generation","Condition"))
+
+```
+
+
+#Credits
+```{r}
+#Citations
+citation()
+citation("lme4")
+```
+
+
+
+
+
+
+
+
+
+
+
+
