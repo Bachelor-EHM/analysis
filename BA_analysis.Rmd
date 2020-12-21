@@ -205,7 +205,7 @@ sat <- lmer(
   Saturation_matched ~ Generation + Condition + Generation:Condition + 
   (1 + Generation + Condition + Generation:Condition | Color_label_matched) +
   (1 + Generation + Condition + Generation:Condition | Chain) + 
-  (1 + Generation + Condition + Generation:Condition | Chain:Subject), 
+  (1 | Chain:Subject), 
   data = danish, 
   REML = T, 
   control = lmerControl(
@@ -241,8 +241,7 @@ sat_no_c <- lmer(
   (1 | Color_label_matched) +
   (0 + Generation + Condition + Generation:Condition | Chain) + 
   (1 | Chain) + 
-  (0 + Generation + Condition + Generation:Condition | Chain:Subject) +
-  (1 | Chain:Subject), 
+  (0 + Generation + Condition + Generation:Condition | Chain:Subject), 
   data = danish, 
   REML = T, 
   control = lmerControl(
@@ -463,6 +462,25 @@ hue <- lmer(
   )))
 summary(hue)
 
+#Baswed on insights from Sophia, we try a new structure
+#mo(Generation) treat generation as monototic variable, meaning that it can't go back in generation (sort of like a time variable)
+
+hue2 <- lmer(
+  Rel_dif ~ 0 + mo(Generation) + Condition + mo(Generation):Condition +
+  (1 + mo(Generation) + Condition + mo(Generation):Condition | Color_label_matched) + 
+  (1 + Condition | gr(Subject, by = Chain)),
+  data = danish, 
+  REML = F, control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10,
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+
+summary(hue2)
 ##Testing random effects##
 
 ## The same model with decorrelated random effects structure:
@@ -485,7 +503,8 @@ hue_no_cor <- lmer(
     xtol_abs = 1e-10,
     maxeval = 10000
   )))
-summary(sat_no_cor)
+
+summary(hue_no_cor)
 
 ## Test the necessity of the correlation parameter:
 anova(hue, hue_no_cor, refit = F) 
@@ -641,7 +660,7 @@ plot(fitted(final_hue), residuals(final_hue)) # good
 
 ## Inspect the random effects estimates:
 
-coef(final_hue) 
+  coef(final_hue) 
 ##Intercepts:
 # For the subjects all intercepts are constant at 99.6 meaning that they are all close to 100% which would be the seed color - but I generally don't get the slopes
 # For the chain and color coefficiants the intercepts vary according how far the first generation was from the seed color 
@@ -662,33 +681,49 @@ coef(final_hue)
 
 #Modeling colors seperately
 ```{r}
-hue_null <- lmer(
-  Rel_dif ~ 1 + Color_label_matched
-  (1 + Generation + Condition + Generation:Condition | Color_label_matched) + 
-  (1 + Generation + Condition + Generation:Condition| Chain) +
-  (1 + Generation + Condition + Generation:Condition| Chain:Subject))
+danish$Generation <- as.ordered(danish$Generation)
+danish$Generation <- as.numeric(danish$Generation)
+
+color1 <- lmer(
+  Rel_dif ~ Generation:Color_label_matched +
+  (1 + Generation + Condition + Generation:Color_label_matched | Chain) +
+  (1 + Generation + Condition + Generation:Color_label_matched | Chain:Subject),
+  data = danish, 
+  REML = T, 
+  control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10, 
+    xtol_abs = 1e-10,
+    maxeval = 10000
+      )))
+summary(color1)
+?lmer
+#Looking at the last generation 
 
 #Effect of color
-model3 <- lm(Rel_dif ~ 0 + Color_label_matched * Generation, data = danish)
-summary(model3)
+color_gen_hue <- lm(Rel_dif ~ 0 + Color_label_matched * Generation, data = danish)
+summary(color_gen_hue)
 
-model4 <- lm(Saturation_matched ~ 0 + Color_label_matched * Generation, data = danish)
-summary(model4)
+color_gen_sat <- lm(Saturation_matched ~ 0 + Color_label_matched * Generation, data = danish)
+summary(color_gen_sat)
 
 #Effect of color in interaction with condition
-model5 <- lm(Rel_dif ~ 0 + Color_label_matched * Generation * Condition, data = danish)
-summary(model5)
+color_interaction_hue <- lm(Rel_dif ~ 0 + Color_label_matched * Generation * Condition, data = danish)
+summary(color_interaction_hue)
 
-model6 <- lm(Saturation_matched ~ 0 + Color_label_matched * Generation * Condition, data = danish)
-summary(model6)
+color_interaction_sat <- lm(Saturation_matched ~ 0 + Color_label_matched * Generation * Condition, data = danish)
+summary(color_interaction_sat)
 
 #Let's compare the models
 # Hue:
-anova(model3, model5)
-# model 5 is significantly different from model 3, so it would be the best explaining model
+anova(color_gen_hue, color_interaction_hue)
+# color_interaction_hue is significantly different from color_gen_hue, so it would be the best explaining model
 
 # Saturation:
-anova(model4, model6)
+anova(color_gen_sat, color_interaction_sat)
 # again the model with condition is the best fitting model
 
 
