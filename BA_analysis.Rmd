@@ -63,27 +63,6 @@ write.csv(data, "data.csv")
 #Datasets divided into Danish and English
 danish <- data %>% filter(Language == "Danish")
 english <- data %>% filter(Language == "English") %>% filter(!Chain=="2")
-#Subset for each condition
-cond1_danish <- danish %>% filter(Condition==1)
-cond2_danish <- danish %>% filter(Condition==2)
-cond1_english <- english %>% filter(Condition==1)
-cond2_english <- english %>% filter(Condition==2)
-
-#Subsets by color
-d_red <- danish %>% filter(Color_label_matched == "seed dark rose")
-d_yellow <- danish %>% filter(Color_label_matched == "seed mustard")
-d_green <- danish %>% filter(Color_label_matched == "seed grass green")
-d_blue <- danish %>% filter(Color_label_matched == "seed ocean blue")
-
-#Subsets by color AND condition
-d_red_cond1 <- d_red %>% filter(Condition=="1")
-d_red_cond2 <- d_red %>% filter(Condition=="2")
-d_yellow_cond1 <- d_yellow %>% filter(Condition=="1")
-d_yellow_cond2 <- d_yellow %>% filter(Condition=="2")
-d_green_cond1 <- d_green %>% filter(Condition=="1")
-d_green_cond2 <- d_green %>% filter(Condition=="2")
-d_blue_cond1 <- d_blue %>% filter(Condition=="1")
-d_blue_cond2 <- d_blue %>% filter(Condition=="2")
 
 ```
 
