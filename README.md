@@ -1,2 +1,2 @@
-# analysis
-Here we can make the statistical analyses we need for our bachelor
+# Analysis
+Script and data used for the statistical analyses of the bachelor thesis
