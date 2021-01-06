@@ -10,71 +10,28 @@ Setup
 ```{r setup, include=FALSE}
 #Load!
 pacman::p_load(readr,tidyverse,dplyr,ggplot2,pastecs,ez,reshape2,stringr,lme4,stats,MuMIn,broom,emmeans,afex,lmerTest,scales,rstatix,ggpubr,magrittr,stats)
+#Clean environment
+rm(list = ls())
 ```
 
 #Loading the data
 ```{r}
 color_matching <- read.csv("Cleaned_data/color_matching.csv")
 color_naming <- read.csv("Cleaned_data/color_naming.csv")
+color_matching_day1 <- read.csv("Cleaned_data/color_matching2020-10-22.csv", sep = ",")
+color_naming_day1 <- read.csv("Cleaned_data/color_naming2020-10-22.csv")
+color_matching_day6 <- read.csv("Cleaned_data/color_matching2020-10-26.csv")
+color_naming_day6 <- read.csv("Cleaned_data/color_naming2020-10-26.csv")
+color_matching_all <- read.csv("Cleaned_data/color_matching2020-11-06.csv")
+color_naming_all <- read.csv("Cleaned_data/color_naming2020-10-31.csv")
+color_matching_posthoc <- read.csv("Cleaned_data/color_matching2020-11-11.csv")
 
+colnames(color_matching_posthoc)
 ```
 
-
-#Exploratory
-Some things me and Hania tested Sunday the 18/10
-```{r}
-color_matching[1,12]
-
-color_matching <- color_matching %>% 
-  group_by(Generation, seed_color) %>% 
-  filter(source_color.h) %>% 
-  mutate(dh = min(abs(h_matching-h_seed), 360-abs(h_matching-h_seed)/180.0))
-
-
-
-h_seed <- color_matching %>% group_by(Generation, seed_color) %>% filter(source_color.h)
-h_matching <- color_matching %>% group_by(generation, seed_color) %>% filter(color.h)
-dh = min(abs(h_matching-h_seed), 360-abs(h_matching-h_seed)/180.0)
-```
 
 #Eva's code
 
-Hues defined
-```{r}
-#Hues of each color 
-red <- 12.2
-yellow <- 62.4
-green <- 136.5
-blue <- 193.6
-
-#Hues of seed colors
-reddish <- 327.55
-yellowish <- 49.85
-greenish <- 117.98
-blueish <- 179.34
-
-```
-
-Data loading and preprocessing test data
-```{r}
-#Load test data
-Test2 <- read_csv("Test2.csv")
-
-#As factors 
-Test2$Condition <- as.factor(Test2$Condition)
-Test2$Chain <- as.factor(Test2$Chain)
-Test2$Color <- as.factor(Test2$Color)
-
-
-#Add column with difference between matched hue and focal:
-Test2$Abs_Dif <- Test2$Focal-Test2$Hue
-
-#Ass column with relative difference between matched hue and focal:
-Test2$Rel_Dif <- 100/(Test2$Focal-Test2$Seed)*Test2$Abs_Dif
-
-View(Test2)
-
-```
 
 Modelling test data
 ```{r}
@@ -181,66 +138,48 @@ cond_hue_line
 
 #Using real data
 
-NB: should be moved to data cleaning
-```{r}
-#adding column color
-# color_matching <- color_matching %>% 
-#   mutate(Color = case_when(
-#           between(source_color.h, 5, 93) ~ "mustard",
-#           between(source_color.h, 112, 152) ~ "grass green",
-#           between(source_color.h, 170, 200) ~ "ocean blue",
-#           between(source_color.h, 300, 340) ~ "dark rose"))
-
-#adding column focal
-color_matching <- color_matching %>% 
-  mutate(Focal = case_when(
-          Color_label_matched == "seed mustard" ~ yellow,
-          Color_label_matched == "seed grass green" ~ green,
-          Color_label_matched == "seed ocean blue" ~ blue,
-          Color_label_matched == "seed dark rose" ~ red))
-
-
-#As factors cleaned
-color_matching$Condition <- as.factor(color_matching$Condition)
-color_matching$Chain <- as.factor(color_matching$Chain)
-color_matching$Color_label_matched <- as.factor(color_matching$Color_label_matched) #something we don't have yet
-
-
-#Add column with difference between matched hue and focal:
-color_matching$Abs_Dif <- color_matching$Focal-color_matching$Hue_matched
-
-#trying to solve problem with red
-color_matching$Abs_Dif2 <- min(abs(color_matching$Focal-color_matching$Hue_matched), 360-abs(color_matching$Focal-color_matching$Hue_matched)/180.0)
-
-
-#skal give 34.2
-min(abs(12.2 - 278), 360-abs(12.2 - 278)/180)
-360-265.8
-?min
-
-#Add column with relative difference between matched hue and focal:
-color_matching$Rel_Dif <- 100/(color_matching$Focal-color_matching$source_color.h)*color_matching$Abs_Dif
-
-```
-
 
 Modelling cleaned data
 NB: does not have enough data yet...
 ```{r}
+color_matching <- color_matching_all
 
 #Very simple model
 simple_m_sat <- lm(Saturation_matched ~ Generation + Color_label_matched, data = color_matching)
 summary(simple_m_sat)
 
-simple_m_hue <- lm(Rel_Dif ~ Generation + Color_label_matched, data = color_matching)
+simple_m_hue <- lm(Rel_dif ~ Generation + Color_label_matched, data = danish)
 summary(simple_m_hue)
+
+simple_m_hue_y <- lm(Rel_dif ~ Generation, data = d_yellow)
+summary(simple_m_hue_y)
+simple_m_hue_b <- lm(Rel_dif ~ Generation, data = d_blue)
+summary(simple_m_hue_b)
+
+simple_m_hue_r <- lm(Rel_dif ~ Generation, data = d_red)
+summary(simple_m_hue_r)
+simple_m_hue_g <- lm(Rel_dif ~ Generation, data = d_green)
+summary(simple_m_hue_g)
+
+#Secondary hues
+simple_m_hue_y2 <- lm(Rel_dif_2 ~ Generation, data = d_yellow)
+summary(simple_m_hue_y2)
+simple_m_hue_b <- lm(Rel_dif ~ Generation, data = d_blue)
+summary(simple_m_hue_b)
+
+simple_m_hue_r2 <- lm(Rel_dif_2 ~ Generation, data = d_red)
+summary(simple_m_hue_r2)
+simple_m_hue_g <- lm(Rel_dif ~ Generation, data = d_green)
+summary(simple_m_hue_g)
+
+
 
 #NB: The is a datapoint included for each chain with the seed coordinates (not a matching). Should no be included IRL.
 
 #Saturation
 require(afex)
 set_sum_contrasts()
-model1 <- lmer(color.s ~ Condition + Generation + Color + (0 + Chain|Generation), data = color_matching, REML = F, control = lmerControl(
+model1 <- lmer(Saturation_matched ~ Condition + Generation + Color_label_matched + (0 + Chain|Generation), data = danish, REML = F, control = lmerControl(
   optimizer = "nloptwrap",
   calc.derivs = F,
   optCtrl = list(
@@ -254,7 +193,7 @@ summary(model1)
 #What is the matter with 0 or 1 in random effects? 
 require(afex)
 set_sum_contrasts()
-model2 <- lmer(Rel_Dif ~ Condition + Generation + Color + (0 + Chain|Generation), data = color_matching, REML = F, control = lmerControl(
+model2 <- lmer(Rel_dif ~ Condition + Generation + Color_label_matched + (0 + Chain|Generation), data = danish, REML = F, control = lmerControl(
   optimizer = "nloptwrap",
   calc.derivs = F,
   optCtrl = list(
@@ -262,7 +201,7 @@ model2 <- lmer(Rel_Dif ~ Condition + Generation + Color + (0 + Chain|Generation)
     xtol_abs = 1e-10,
     maxeval = 10000
   )))
-summary(mm2)
+summary(model2)
 
 ```
 

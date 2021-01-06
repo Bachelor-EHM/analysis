@@ -47,6 +47,7 @@ data$Confidence <- rescale(data$Confidence, to = c(1, 7))
 #Rename gender for prettier plots
 data$Gender <- ifelse(data$Gender == "female", "Female", "Male")
 
+write.csv(data, "data.csv")
 ```
 
 
@@ -91,20 +92,18 @@ stats_hue <- danish %>%
   summarise(max(Rel_dif),min(Rel_dif),mean(Hue_matched)) %>% 
   arrange(Color_label_matched)
 
-hue_by_color_overall <- danish %>% 
+hue_by_color_overall <- data %>% 
   group_by(Color_label_matched, Condition) %>% 
-  summarise(max(Rel_dif), min(Rel_dif), mean(Rel_dif), max(Rel_dif_2),min(Rel_dif_2), mean(Rel_dif_2), max(Hue_matched), min(Hue_matched), mean(Hue_matched), mean(Seed), mean(Focal), mean(Secondary_focal))
+  summarise(max(Rel_dif), min(Rel_dif), mean(Rel_dif), sd(Rel_dif), max(Rel_dif_2),min(Rel_dif_2), mean(Rel_dif_2), max(Hue_matched), min(Hue_matched), mean(Hue_matched), mean(Seed), mean(Focal), mean(Secondary_focal))
 
 
 #Saturation
-stats_sat <- danish %>% 
-  #group_by(Chain) %>% 
-  summarise(max(Saturation_matched),min(Saturation_matched),mean(Saturation_matched))
+stats_sat <- data %>% 
+  group_by(Color_label_matched, Condition) %>% 
+  summarise(max(Saturation_matched),min(Saturation_matched),mean(Saturation_matched), sd(Saturation_matched))
+
 
 ```
-
-
-
 
 
 #Demographics
@@ -188,201 +187,15 @@ unique_english %>%  filter(Condition=="2") %>% count("Language_class")
 
 ```
 
-
-#Plots
-```{r}
-#CONDITION 1
-#Rescale Chains
-danish$Chain <- rescale(as.numeric(danish$Chain), to = c(1, 5))
-danish$Chain <- as.factor(danish$Chain)
-
-cond_1_hue <- ggplot(danish, aes(x = Generation, y = Rel_dif, group = Chain, color = Chain))+
-  geom_line(stat="summary") +
-  expand_limits(y=0) +
-  xlab("Generation") + 
-  ylab("Relative difference %") +
-  ggtitle("Plot") +
-  facet_wrap(~ Color_label_source)
-cond_1_hue
-
-cond_1_sat <- ggplot(danish, aes(x = Generation, y = Saturation_matched, group = Chain, color = Chain))+
-  geom_line(stat="summary") +
-  expand_limits(y=0) +
-  xlab("Generation") + 
-  ylab("Saturation %") +
-  ggtitle("Plot") +
-  facet_wrap(~ Color_label_source)
-cond_1_sat
-
-#CONDITION 2
-cond_2_hue <- ggplot(cond2_danish, aes(x = Generation, y = Rel_dif, group = Chain, color = Chain))+
-  geom_line(stat="summary") +
-  expand_limits(y=0) +
-  xlab("Generation") + 
-  ylab("Relative difference %") +
-  ggtitle("Plot") +
-  facet_wrap(~ Color_label_source)
-cond_2_hue
-
-cond_2_sat <- ggplot(cond2_danish, aes(x = Generation, y = Saturation_matched, group = Chain, color = Chain))+
-  geom_line(stat="summary") +
-  expand_limits(y=0) +
-  xlab("Generation") + 
-  ylab("Saturation %") +
-  ggtitle("Plot") +
-  facet_wrap(~ Color_label_source)
-cond_2_sat
-
-#ENGLISH
-english_hue <- ggplot(english, aes(x = Generation, y = Rel_dif, group = Condition, color = Condition))+
-  geom_line(stat="summary") +
-  expand_limits(y=0) +
-  xlab("Generation") + 
-  ylab("Relative difference %") +
-  ggtitle("Plot") +
-  facet_wrap(~ Color_label_source)
-english_hue
-
-english_sat <- ggplot(english, aes(x = Generation, y = Saturation_matched, group = Condition, color = Condition))+
-  geom_line(stat="summary") +
-  expand_limits(y=0) +
-  xlab("Generation") + 
-  ylab("Saturation %") +
-  ggtitle("Plot") +
-  facet_wrap(~ Color_label_source)
-english_sat
-
-
-
-#Considerations from plot-viewing: 
-#Consider looking for whether participant 1 chooses approximate the same difference from start hue and saturation for each different color (seems like it)
-acc_hue_no_outs <- ggplot(data_no_outliers_hue, aes(x = Confidence, y = Accuracy_hue))+
-  geom_smooth(aes(color=Color_label_matched, fill = Color_label_matched), method="lm") +
-  geom_point(aes(color=Gender))+
-  scale_fill_manual(values = c("#cc3386", "#38cc33", "#ccb233", "#33ccca"))+
-  scale_color_manual(values = c(brew_mix[3], brew_mix[11], "#cc3386", "#38cc33", "#ccb233", "#33ccca"))+
-  labs(x = "Confidence", 
-       y ="Accuracy of matching hue",
-       title = "Accuracy predicted by confidence",
-       subtitle = "Without Outliers")+
-  theme_minimal() + theme(
-    #panel.grid = element_blank(), 
-    legend.position = "none")+
-    #axis.ticks.y = element_blank())+
-  facet_wrap(~ Color_label_matched)
-acc_hue_no_outs
-ggarrange(acc_hue,acc_hue_no_outs)
-
-
-#RED
-library(viridisLite, colorbrewer)
-install.packages("remotes")
-remotes::install_github("patrickreidy/callierr")
-d_red %>% group_by(Chain) %>% summarise(mean(Hue_matched), mean(Saturation_matched))
-?as.hex
-
-red_hue<- ggplot(d_red, aes(x = Generation, y = Rel_dif, group = Chain))+
-  geom_line(stat="summary", aes(color = Chain)) +
-  expand_limits(y=0) +
-  xlab("Generation") + 
-  ylab("Relative difference %") +
-  ggtitle("Plot hue red") +
-  facet_wrap(~ Condition) +
-  scale_color_viridis_d(begin=0.1,end=0.9,option = "C") + 
-  theme_light()
-red_hue
-
-red_sat <- ggplot(d_red, aes(x = Generation, y = Saturation_matched, group = Chain))+
-  geom_line(stat="summary", aes(color = Chain)) +
-  expand_limits(y=0) +
-  xlab("Generation") + 
-  ylab("Saturation %") +
-  ggtitle("Plot saturation red") +
-  facet_wrap(~ Condition)+
-  scale_color_viridis_d(begin=0.1,end=0.9,option = "C") + 
-  theme_light()
-red_sat
-
-#YELLOW
-yellow_hue <- ggplot(d_yellow, aes(x = Generation, y = Rel_dif, group = Chain, color = Chain))+
-  geom_line(stat="summary") +
-  expand_limits(y=0) +
-  xlab("Generation") + 
-  ylab("Relative difference %") +
-  ggtitle("Plot hue yellow") +
-  facet_wrap(~ Condition)+
-  scale_color_viridis_d(begin=0.7,end=1,option = "inferno") + 
-  theme_dark()
-yellow_hue
-
-yellow_sat <- ggplot(d_yellow, aes(x = Generation, y = Saturation_matched, group = Chain, color = Chain))+
-  geom_line(stat="summary") +
-  expand_limits(y=0) +
-  xlab("Generation") + 
-  ylab("Saturation %") +
-  ggtitle("Plot saturation yellow") +
-  facet_wrap(~ Condition)+
-  scale_color_viridis_d(begin=0.7,end=1,option = "inferno") + 
-  theme_dark()
-yellow_sat
-
-#GREEN
-green_hue <- ggplot(d_green, aes(x = Generation, y = Rel_dif, group = Chain, color = Chain))+
-  geom_line(stat="summary") +
-  expand_limits(y=0) +
-  xlab("Generation") + 
-  ylab("Relative difference %") +
-  ggtitle("Plot hue green") +
-  facet_wrap(~ Condition)+
-  scale_color_viridis_d(begin=0.3,end=0.9,option = "D") + 
-  theme_light()
-green_hue
-
-green_sat <- ggplot(d_green, aes(x = Generation, y = Saturation_matched, group = Chain, color = Chain))+
-  geom_line(stat="summary") +
-  expand_limits(y=0) +
-  xlab("Generation") + 
-  ylab("Saturation %") +
-  ggtitle("Plot saturation green") +
-  facet_wrap(~ Condition)+
-  scale_color_viridis_d(begin=0.3,end=0.9,option = "D") + 
-  theme_light()
-green_sat
-
-#BLUE
-blue_hue <- ggplot(d_blue, aes(x = Generation, y = Rel_dif, group = Chain, color = Chain))+
-  geom_line(stat="summary") +
-  expand_limits(y=0) +
-  xlab("Generation") + 
-  ylab("Relative difference %") +
-  ggtitle("Plot") +
-  facet_wrap(~ Condition)+
-  scale_color_brewer(palette = "Blues") + 
-  theme_light()
-blue_hue
-?scale_color_brewer()
-blue_sat <- ggplot(blue, aes(x = Generation, y = Saturation_matched, group = Chain, color = Chain))+
-  geom_line(stat="summary") +
-  expand_limits(y=0) +
-  xlab("Generation") + 
-  ylab("Saturation %") +
-  ggtitle("Plot") +
-  facet_wrap(~ Condition)
-blue_sat
-
-```
-
-
-
 #Normality checks
 ```{r}
 
 #Normality (Shapiro-Wilks)
-danish %>% group_by(Chain, Condition, Color_label_matched) %>% shapiro_test(Rel_dif)
+norm_hue <- danish %>% group_by(Chain, Condition, Color_label_matched) %>% shapiro_test(Rel_dif) %>% arrange(Color_label_matched)
 ggqqplot(danish, "Rel_dif", ggtheme = theme_bw()) +
   facet_grid(Condition + Color_label_matched ~ Chain, labeller = "label_both")
 
-danish %>% group_by(Chain, Condition, Color_label_matched) %>% shapiro_test(Saturation_matched)
+norm_sat <- danish %>% group_by(Chain, Condition, Color_label_matched) %>% shapiro_test(Saturation_matched)
 ggqqplot(danish, "Saturation_matched", ggtheme = theme_bw()) +
   facet_grid(Condition + Color_label_matched ~ Chain, labeller = "label_both")
 
@@ -628,7 +441,7 @@ plot(fitted(final_sat), residuals(final_sat)) # good
 
 coef(final_sat) 
 # All subjects, chains and colors have the same intercept that we put to 60% saturation
-# for chain 0 in condition 2 the slope has a very steep drop of -24
+# for chain 1 in condition 2 the slope has a very steep drop of -24
 # the effect of generation is basically 0 across chains which is also evident from the insignificant fixed effect of generation from the model output
 ```
 
@@ -791,7 +604,7 @@ summary(hue_interaction_only)
 
 ##Null model
 hue_null <- lmer(
-  Rel_dif ~ 1 +
+  Rel_dif ~ 1 + 
   (1 + Generation + Condition + Generation:Condition | Color_label_matched) + 
   (1 + Generation + Condition + Generation:Condition| Chain) +
   (1 + Generation + Condition + Generation:Condition| Chain:Subject),
@@ -839,9 +652,9 @@ coef(final_hue)
 # For the chain and color coefficiants the intercepts vary according how far the first generation was from the seed color 
 
 ##Coefficients within chains:
-# it looks like chain 2 and 3 are the sinners, as they only have positive slopes, where all the others have negative slopes
-# chain two seems to have an especially steep positive slope for condition 2
-# chain four seems to have an especially steep negative slope for condition 2
+# it looks like chain 3 and 4 are the sinners, as they only have positive slopes, where all the others have negative slopes
+# chain 3 seems to have an especially steep positive slope for condition 2
+# chain 5 seems to have an especially steep negative slope for condition 2
 
 ##Coefficients within colors:
 # dark rose seems to generally produce a positive slope meaning that it converges away from it's focal color but instead towards blue
@@ -854,6 +667,12 @@ coef(final_hue)
 
 #Modeling colors seperately
 ```{r}
+hue_null <- lmer(
+  Rel_dif ~ 1 + Color_label_matched
+  (1 + Generation + Condition + Generation:Condition | Color_label_matched) + 
+  (1 + Generation + Condition + Generation:Condition| Chain) +
+  (1 + Generation + Condition + Generation:Condition| Chain:Subject))
+
 #Effect of color
 model3 <- lm(Rel_dif ~ 0 + Color_label_matched * Generation, data = danish)
 summary(model3)
@@ -923,12 +742,12 @@ anova(hue_grass_null, hue_grass, hue_grass_with_interaction)
 
 
 #Exploratory Analyses 1:
-Testing the post hoc analysis that for the seed colors that converges in the opporsite direction, they might converge towards their secondary intermediate hues instead of their primary foci
+Testing the post hoc hypothesis that for the seed colors that converges in the opporsite direction, they might converge towards their secondary intermediate hues instead of their primary foci
 
 ```{r}
 #Secondary hues
 model7 <- lm(Rel_dif_2 ~ 0 + Color_label_matched * Generation, data = danish)
-summary(model5)
+summary(model7)
 # all the slopes for color are significant, but only the red seed, converges towards it's secondary focal (the relative distance becomes smaller: -2.9191 p = < 00.1), namely purple, whereas all other seeds converges away from the secondary focal (the distance becomes bigger)
 
 
@@ -973,83 +792,7 @@ sat_acc_con <- lm(Accuracy_sat ~ Confidence:Gender, data = data_no_outliers_sat)
 summary(sat_acc_con)
 
 
-#Brewer color palette for plotting gender
-brew_mix <- usecol(c(rev(  brewer.pal(n = 4, name = "Reds")), 
-                     "white", brewer.pal(n = 4, name = "Blues")), n = 13)
-show_col(brew_mix)
 
-#Plotting accuracy predicted by confidence
-acc_hue <- ggplot(data, aes(x = Confidence, y = Accuracy_hue))+
-  geom_smooth(aes(color=Color_label_matched, fill = Color_label_matched), method="lm") +
-  geom_point(aes(color=Gender))+
-  scale_fill_manual(values = c("#cc3386", "#38cc33", "#ccb233", "#33ccca"))+
-  scale_color_manual(values = c(brew_mix[3], brew_mix[11], "#cc3386", "#38cc33", "#ccb233", "#33ccca"))+
-  labs(x = "Confidence", 
-       y ="Accuracy of matching hue",
-       title = "Accuracy predicted by confidence",
-       subtitle = "With Outliers")+
-  theme_minimal() + theme(
-    #panel.grid = element_blank(), 
-    legend.position = "none")+
-    #axis.ticks.y = element_blank())+
-  facet_wrap(~ Color_label_matched)
-acc_hue
-
-#Without outliers
-acc_hue_no_outs <- ggplot(data_no_outliers_hue, aes(x = Confidence, y = Accuracy_hue))+
-  geom_smooth(aes(color=Color_label_matched, fill = Color_label_matched), method="lm") +
-  geom_point(aes(color=Gender))+
-  scale_fill_manual(values = c("#cc3386", "#38cc33", "#ccb233", "#33ccca"))+
-  scale_color_manual(values = c(brew_mix[3], brew_mix[11], "#cc3386", "#38cc33", "#ccb233", "#33ccca"))+
-  labs(x = "Confidence", 
-       y ="Accuracy of matching hue",
-       title = "Accuracy predicted by confidence",
-       subtitle = "Without Outliers")+
-  theme_minimal() + theme(
-    #panel.grid = element_blank(), 
-    legend.position = "none")+
-    #axis.ticks.y = element_blank())+
-  facet_wrap(~ Color_label_matched)
-acc_hue_no_outs
-ggarrange(acc_hue,acc_hue_no_outs)
-
-##By Gender
-#subsetting gender
-female <- data %>% filter(Gender=="female")
-male <- data %>% filter(Gender=="male")
-
-
-#Accuracy predicted by gender
-acc1_hue_f <- ggplot(female, aes(x = Confidence, y = Accuracy_hue))+
-  geom_smooth(aes(color=Color_label_matched, fill = Color_label_matched), method="lm") +
-  geom_point(color="red")+
-  scale_fill_manual(values = c("#cc3386", "#38cc33", "#ccb233", "#33ccca"))+
-  scale_color_manual(values = c("#cc3386", "#38cc33", "#ccb233", "#33ccca"))+
-  labs(x = "Confidence", 
-       y ="Accuracy of matching hue",
-       title = "Accuracy predicted by confidence",
-       subtitle = "Female")+
-  theme_minimal() + theme(
-    legend.position = "none")+
-  ggplot2::facet_wrap(~ Color_label_matched)
-acc1_hue_f
-
-acc1_hue_m <- ggplot(male, aes(x = Confidence, y = Accuracy_hue))+
-  geom_smooth(aes(color=Color_label_matched, fill = Color_label_matched), method="lm") +
-  geom_point()+
-  scale_fill_manual(values = c("#cc3386", "#38cc33", "#ccb233", "#33ccca"))+
-  scale_color_manual(values = c("#cc3386", "#38cc33", "#ccb233", "#33ccca"))+
-  labs(x = "Confidence", 
-       y ="Accuracy of matching hue",
-       title = "Accuracy predicted by confidence",
-       subtitle = "Male")+
-  theme_minimal() + theme(
-    legend.position = "none")+
-  ggplot2::facet_wrap(~ Color_label_matched)
-acc1_hue_m
-
-#placing them next to each other
-ggarrange(acc1_hue_f, acc1_hue_m)
 ```
 
 By color for hue
@@ -1119,7 +862,7 @@ acc_hue_y
 #placing them next to each other
 accuracy_hue <- ggarrange(acc_hue_r, acc_hue_b, acc_hue_g, acc_hue_y, labels = "Accuracy predicted by confidence - with outliers", hjust = -0.1, font.label = list(size = 12))
 # Save the plot to a pdf
-ggsave("accuracy_hue.pdf")
+ggsave("accuracy_hue.png")
 
 #Same plot without outliers
 range(data_no_outliers_hue$Accuracy_hue)
@@ -1130,7 +873,7 @@ acc_hue_y2<-acc_hue_y %+% d_yellow[d_yellow$Accuracy_hue<14,]
 accuracy_hue_no_outs <- ggarrange(acc_hue_r2, acc_hue_b2, acc_hue_g2, acc_hue_y2, labels = "Accuracy predicted by confidence - without outliers", hjust = -0.1, font.label = list(size = 12))
 
 # Save the plot to a pdf
-ggsave("accuracy_hue_no_outs.pdf")
+ggsave("accuracy_hue_no_outs.png")
 ```
 
 By color for saturation
@@ -1199,7 +942,7 @@ acc_sat_y
 #placing them next to each other
 accuracy_sat <- ggarrange(acc_sat_r, acc_sat_b, acc_sat_g, acc_sat_y, labels = "Accuracy predicted by confidence - with outliers", hjust = -0.1, font.label = list(size = 12))
 # Save the plot to a pdf
-ggsave("accuracy_sat.pdf")
+ggsave("accuracy_sat.png")
 
 range(data_no_outliers_sat$Accuracy_sat)
 acc_sat_r2<-acc_sat_r %+% d_red[d_red$Accuracy_sat<24,]
@@ -1209,7 +952,7 @@ acc_sat_y2<-acc_sat_y %+% d_yellow[d_yellow$Accuracy_sat<24,]
 accuracy_sat_no_outs <- ggarrange(acc_sat_r2, acc_sat_b2, acc_sat_g2, acc_sat_y2, labels = "Accuracy predicted by confidence - without outliers", hjust = -0.1, font.label = list(size = 12))
 
 # Save the plot to a pdf
-ggsave("accuracy_sat_no_outs.pdf")
+ggsave("accuracy_sat_no_outs.png")
 
 ```
 
@@ -1228,7 +971,12 @@ plot <- ggplot(d_red, aes(x = Generation, y = Rel_dif_2, group = Chain, color = 
 plot
 ```
 
-
+#Credits
+```{r}
+#Citations
+citation()
+citation("lme4")
+```
 
 
 

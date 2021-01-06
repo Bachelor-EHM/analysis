@@ -83,19 +83,19 @@ d_blue_cond2 <- d_blue %>% filter(Condition=="2")
 ```{r}
 #Hue maximum, minimum and mean
 stats_hue <- danish %>% 
-  group_by(Chain, Condition,Color_label_matched) %>% 
-  summarise(max(Rel_dif),min(Rel_dif),mean(Hue_matched)) %>% 
+  group_by(Condition,Color_label_matched) %>% 
+  summarise(max(Rel_dif),min(Rel_dif),mean(Hue_matched), sd(Rel_dif), mean(Seed), mean(Focal), mean(Accuracy_hue), sd(Accuracy_hue), mean(Confidence)) %>% 
   arrange(Color_label_matched)
 
-hue_by_color_overall <- data %>% 
+stats_hue2 <- data %>% 
   group_by(Color_label_matched, Condition) %>% 
-  summarise(max(Rel_dif), min(Rel_dif), mean(Rel_dif), sd(Rel_dif), max(Rel_dif_2),min(Rel_dif_2), mean(Rel_dif_2), max(Hue_matched), min(Hue_matched), mean(Hue_matched), mean(Seed), mean(Focal), mean(Secondary_focal))
+  summarise(max(Rel_dif_2),min(Rel_dif_2), mean(Rel_dif_2), sd(Rel_dif_2), mean(Secondary_focal))
 
 
 #Saturation
 stats_sat <- data %>% 
   group_by(Color_label_matched, Condition) %>% 
-  summarise(max(Saturation_matched),min(Saturation_matched),mean(Saturation_matched), sd(Saturation_matched))
+  summarise(max(Saturation_matched),min(Saturation_matched),mean(Saturation_matched), sd(Saturation_matched), mean(Accuracy_sat))
 
 
 ```
@@ -445,6 +445,7 @@ coef(final_sat)
 ```{r}
 ## Construct mixed model with random slopes for generation, condition and interaction between generation and condition by color, chain, and subjects in chain:
 
+danish$rel_dif_abs <- abs(danish$Rel_dif)
 hue <- lmer(
   Rel_dif ~ Generation + Condition + Generation:Condition +
   (1 + Generation + Condition + Generation:Condition | Color_label_matched) + 
@@ -461,6 +462,23 @@ hue <- lmer(
     maxeval = 10000
   )))
 summary(hue)
+
+hue2 <- lmer(
+  rel_dif_abs ~ Generation + Condition + Generation:Condition +
+  (1 + Generation + Condition + Generation:Condition | Color_label_matched) + 
+  (1 + Generation + Condition + Generation:Condition| Chain) +
+  (1 + Generation + Condition + Generation:Condition| Chain:Subject),
+  data = danish, 
+  REML = F, control = lmerControl(
+  optimizer = "nloptwrap",
+  calc.derivs = F,
+  check.nobs.vs.nRE = "ignore",
+  optCtrl = list(
+    ftol_abs = 1e-10,
+    xtol_abs = 1e-10,
+    maxeval = 10000
+  )))
+summary(hue2)
 
 #Baswed on insights from Sophia, we try a new structure
 #mo(Generation) treat generation as monototic variable, meaning that it can't go back in generation (sort of like a time variable)
@@ -681,8 +699,6 @@ plot(fitted(final_hue), residuals(final_hue)) # good
 
 #Modeling colors seperately
 ```{r}
-danish$Generation <- as.ordered(danish$Generation)
-danish$Generation <- as.numeric(danish$Generation)
 
 color1 <- lmer(
   Rel_dif ~ Generation:Color_label_matched +
@@ -824,16 +840,6 @@ summary(sat_acc_con)
 
 
 ```
-
-
-#Color names
-```{r}
-naming <- read.csv("Cleaned_data/color_naming2020-10-31.csv")
-naming <- naming %>% rename(Color_label_source = Color_label_naming)
-data_labeled <- merge(data, naming, by = c("Color_label_source","Subject","Chain","Generation","Condition"))
-
-```
-
 
 #Credits
 ```{r}
